@@ -1,3 +1,6 @@
+#define STM32F411xE
+#include "stm32f4xx.h"
+
 #include <stdint.h>
 
 # define GPIOC_BASE 0x40020800

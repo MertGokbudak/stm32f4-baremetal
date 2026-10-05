@@ -1,3 +1,6 @@
+#define STM32F446xx
+#include "stm32f4xx.h"
+
 #include <stdint.h>
 
 # define RCC_APB1ENR (*(volatile uint32_t *) (0x40023800 + 0x40))
