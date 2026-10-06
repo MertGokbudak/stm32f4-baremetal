@@ -1,6 +1,3 @@
-#define STM32F446xx
-#include "stm32f4xx.h"
-
 #include <stdint.h>
 
 # define RCC_APB1ENR (*(volatile uint32_t *) (0x40023800 + 0x40))
@@ -40,17 +37,37 @@ uint8_t I2C_read(uint8_t reg, uint8_t adress){
 
 	I2C1_CR1 |= (1U << 8); //Bit 8 START: Start generation
 	while (!( I2C1_SR1 & (1U <<0))); //Bit 0 SB: Start bit (controller mode)
-	I2C1_DR = (adress << 1) | 0 ;//Bits 7:0 DR[7:0] 8-bit data register
-	while (!(I2C1_SR1 & (1U <<1))); //Bit 1 ADDR: Address sent (controller mode)/matched (target mode)
+	I2C1_DR = (adress << 1) | 0 ;//Bits 7:0 DR[7:0] 8-bit data register address- write
+	while (!(I2C1_SR1 & (1U <<1))){ //Bit 1 ADDR: Address sent (controller mode)/matched (target mode)
+		if (I2C1_SR1 & (1U << 10)) {//Bit 10 AF: Acknowledge failure
+			I2C1_SR1 &= ~(1U << 10);
+			I2C1_CR1 |= (1U << 9);//Bit 9 STOP: Stop generation
+			return 0;
+		}
+	}
+	/*Note: In target mode, it is recommended to perform the complete clearing sequence (READ
+	SR1 then READ SR2) after ADDR is set.(IMPORTENT TO AVOID clock stretching*/
 	(void)I2C1_SR1;
 	(void)I2C1_SR2;
-	I2C1_DR = reg;
-	while (!(I2C1_SR1 & (1U <<2))); //Bit 2 BTF: Byte transfer finished
 
-	I2C1_CR1 |= (1U << 8);
-	while (!( I2C1_SR1 & (1U <<0)));
-	I2C1_DR = (adress << 1) | 1 ;
-	while (!(I2C1_SR1 & (1U <<1)));
+	I2C1_DR = reg;
+	while (!(I2C1_SR1 & (1U <<2))){ //Bit 2 BTF: Byte transfer finished - includes ACK
+		if (I2C1_SR1 & (1U << 10)) {//Bit 10 AF: Acknowledge failure
+			I2C1_SR1 &= ~(1U << 10);
+			I2C1_CR1 |= (1U << 9);//Bit 9 STOP: Stop generation
+			return 0;
+		}
+	}
+	I2C1_CR1 |= (1U << 8); //Bit 8 START: Start generation
+	while (!( I2C1_SR1 & (1U <<0))); //Bit 0 SB: Start bit (controller mode)
+	I2C1_DR = (adress << 1) | 1 ;//address-read
+	while (!(I2C1_SR1 & (1U <<1))){ //Bit 1 ADDR: Address sent (controller mode)/matched (target mode)
+		if (I2C1_SR1 & (1U << 10)) {//Bit 10 AF: Acknowledge failure
+			I2C1_SR1 &= ~(1U << 10);
+			I2C1_CR1 |= (1U << 9);//Bit 9 STOP: Stop generation
+			return 0;
+		}
+	}
 	I2C1_CR1 &= ~(1 << 10); // Bit 10 ACK: Acknowledge enable
 	(void)I2C1_SR1;
 	(void)I2C1_SR2;
@@ -60,19 +77,39 @@ uint8_t I2C_read(uint8_t reg, uint8_t adress){
 	return I2C1_DR;
 }
 
-void I2C_write(uint8_t reg, uint8_t value, uint8_t adress) {
-	I2C1_CR1 |= (1U << 8);
-	while (!( I2C1_SR1 & (1U <<0)));
-	I2C1_DR = (adress << 1) | 0 ;
-	while (!(I2C1_SR1 & (1U <<1)));
+uint8_t I2C_write(uint8_t reg, uint8_t value, uint8_t adress) {
+	I2C1_CR1 |= (1U << 8); //Bit 8 START: Start generation
+	while (!( I2C1_SR1 & (1U <<0))); //Bit 0 SB: Start bit (controller mode)
+	I2C1_DR = (adress << 1) | 0 ;//address-write
+	while (!(I2C1_SR1 & (1U <<1))){//Bit 1 ADDR: Address sent (controller mode)
+		if (I2C1_SR1 & (1U << 10)) {//Bit 10 AF: Acknowledge failure
+			I2C1_SR1 &= ~(1U << 10);
+			I2C1_CR1 |= (1U << 9);//Bit 9 STOP: Stop generation
+			return 0;
+		}
+	}
 	(void)I2C1_SR1;
 	(void)I2C1_SR2;
 	I2C1_DR = reg;
-	while (!(I2C1_SR1 & (1U <<7))); //Bit 7 TxE: Data register empty (transmitters)
+	while (!(I2C1_SR1 & (1U <<7))){ //Bit 7 TxE: Data register empty (transmitters)
+		if (I2C1_SR1 & (1U << 10)) {//Bit 10 AF: Acknowledge failure
+			I2C1_SR1 &= ~(1U << 10);
+			I2C1_CR1 |= (1U << 9);//Bit 9 STOP: Stop generation
+			return 0;
+		}
+	}
 	I2C1_DR = value;
-	while (!(I2C1_SR1 & (1U <<2)));
+	while (!(I2C1_SR1 & (1U <<2))){  //Bit 2 BTF: Byte transfer finished - includes ACK
+		if (I2C1_SR1 & (1U << 10)) {//Bit 10 AF: Acknowledge failure
+			I2C1_SR1 &= ~(1U << 10);
+			I2C1_CR1 |= (1U << 9);//Bit 9 STOP: Stop generation
+			return 0;
+		}
+	}
 	I2C1_CR1 |= (1 << 9); //Bit 9 STOP: Stop generation
 	while (I2C1_CR1 & (1U << 9));   // wait untill stop finishes
+
+	return 1; //success
 }
 
 
@@ -127,6 +164,7 @@ int main(void){
 
 	I2C_write(0x6B, 0x00, 0x68);   // PWR_MGMT_1 = 0 close sleep mode
 
+
 	while(1){
 
 		uint8_t h = I2C_read(0x3F, 0x68);
@@ -138,10 +176,10 @@ int main(void){
 		modified_numbers = accel_z;
 
 		if (modified_numbers < 0) {
-					while (!(USART2_SR & (1U << 7)));
-					USART2_DR = '-';
-					modified_numbers = -modified_numbers;
-				}
+			while (!(USART2_SR & (1U << 7)));
+			USART2_DR = '-';
+			modified_numbers = -modified_numbers;
+		}
 
 		int i = 0;
 
@@ -159,6 +197,7 @@ int main(void){
 			while (!(USART2_SR & (1U << 7)));//Status register (USART_SR) Address offset: 0x00 Bit 7 TXE: Transmit data register empty Bit 5 RXNE: Read data register not empty
 
 			USART2_DR = numbers_reversed[t-1] + '0';
+
 		}
 		while (!(USART2_SR & (1U << 7)));
 		USART2_DR = '\n';
