@@ -1,13 +1,7 @@
-#define STM32F411xE
-#include "stm32f4xx.h"
-
 #include <stdint.h>
 
-# define GPIOC_BASE 0x40020800
 # define RCC_BASE 0x40023800
 # define RCC_AHB1ENR (*(volatile uint32_t *) (RCC_BASE + 0x30))
-# define GPIOC_MODER (*(volatile uint32_t *) (GPIOC_BASE + 0x00))
-# define GPIOC_ODR (*(volatile uint32_t *) (GPIOC_BASE + 0x14))
 
 # define GPIOA_MODER (*(volatile uint32_t *) 0x40020000)
 # define GPIOA_AFRL (*(volatile uint32_t *) (0x40020000 + 0x20))
@@ -22,6 +16,7 @@
 
 # define RCC_APB1ENR (*(volatile uint32_t *) (0x40023800 + 0x40))
 # define TIM3_CR1 (*(volatile uint32_t *) (0x40000400 + 0x00))//Auto-reload preload enable
+# define TIM3_EGR (*(volatile uint32_t *) (0x40000400 + 0x14))//Event generation register
 # define TIM3_CCMR1 (*(volatile uint32_t *) (0x40000400 + 0x18))//TIMx capture/compare mode register 1 PWM mode 1
 # define TIM3_CCER (*(volatile uint32_t *) (0x40000400 + 0x20))
 # define TIM3_PSC (*(volatile uint32_t *) (0x40000400 + 0x28))
@@ -29,16 +24,9 @@
 # define TIM3_CCR1 (*(volatile uint32_t *) (0x40000400 + 0x34))
 
 int main(void){
-	//LED
-	//Bit 2GPIOCEN: IO port C clock enable
-	RCC_AHB1ENR &= ~(1U <<2);
-	RCC_AHB1ENR |= (1U <<2);
-
-	GPIOC_MODER &= ~(3U <<(13*2));
-	GPIOC_MODER |= (1U <<(13*2));
 
 	//USART1
-	//USART1 TX
+	//USART1 RX PA10 AF7
 	RCC_AHB1ENR &= ~(1U << 0);
 	RCC_AHB1ENR |= (1U << 0);
 
@@ -51,17 +39,21 @@ int main(void){
 	GPIOA_AFRH &= ~(15U << 8);
 	GPIOA_AFRH |= (7U << 8);
 
+	//Bit 2 RE: Receiver enable
 	USART1_CR1 &= ~(1U << 2);
 	USART1_CR1 |= (1U << 2);
 
 	USART1_BRR = 1667;
 
+	//Bit 13 UE: USART enable
 	USART1_CR1 &= ~(1U << 13);
 	USART1_CR1 |= (1U << 13);
+
 	//TIM3
 	RCC_APB1ENR &= ~(1U << 1);
 	RCC_APB1ENR |= (1U << 1);
 
+	//TIM3 PWM PA6 AF2
 	GPIOA_MODER &= ~(3U << 12);
 	GPIOA_MODER |= (2U <<12);
 
@@ -80,6 +72,8 @@ int main(void){
 	TIM3_PSC = 15;
 	TIM3_ARR = 19999;
 	TIM3_CCR1 = 1500 ;
+	//Bit 0 UG: Update generation - loads PSC and ARR before the counter starts
+	TIM3_EGR = (1U << 0);
 
 	//TIM3_CR1_CEN
 	TIM3_CR1 &= ~(1U << 0);
@@ -90,10 +84,6 @@ int main(void){
 		while (USART1_SR & (1U << 5)){//Bit 5 RXNE: Read data register not empty
 			uint8_t received_data = USART1_DR;
 			TIM3_CCR1 =(received_data * 1000/255) + 1000 ;
-			/*0if (received_data == 'A'){
-				GPIOC_ODR ^= (1U << 13);}
-			for (volatile int i = 0; i < 500000; i++);*/
-
 		}
 	}
 }
