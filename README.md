@@ -4,10 +4,6 @@ Register-level projects for STM32F4, written without HAL.
 The goal is to learn the peripherals from the reference manual and gradually
 build some projects.
 
-<img width="500" alt="Hardware setup" src="https://github.com/user-attachments/assets/f6c581d6-e29e-4f42-b6b2-9bd45e0fbe01" />
-
-*Bottom: Nucleo-F446RE with joystick, HC-12 (transmitter) and MPU6050. Top: Black Pill with HC-12 (receiver) and servo, powered by a power bank.*
-
 Boards:
 - NUCLEO-F446RE
 - WeAct Black Pill (STM32F411CE)
@@ -37,3 +33,8 @@ Reads the Z-axis acceleration from an MPU6050 over I2C and prints it over UART.
 - PB9: I2C1 SDA
 - MPU6050 address: 0x68
 - PA2: USART2 TX 
+
+
+<img width="500" alt="Hardware setup" src="https://github.com/user-attachments/assets/f6c581d6-e29e-4f42-b6b2-9bd45e0fbe01" />
+
+*Bottom: Nucleo-F446RE with joystick, HC-12 (transmitter) and MPU6050. Top: Black Pill with HC-12 (receiver) and servo, powered by a power bank.*
